@@ -1,14 +1,24 @@
 from datetime import datetime
 import random
-import flask
 import time
 import threading
 import requests
 import json
 import menu
 import order_out
+from wsgiref.simple_server import make_server
 
-DH_App = flask.Flask(__name__)
+def DH_App(environment, response):
+    status = '200 OK'
+    headers = [('content-type', 'text/html; charset=utf-8')]
+    response(status, headers)
+    return [b'<h2>Dinning hall server</h2>']
+
+
+with make_server('', 3500, DH_App) as server:
+    print('serving on port 3500...\nvisit http://127.0.0.1:3500\nTo exit press ctrl + c')
+    server.serve_forever()
+    
 st = []
 
 @DH_App.put("/put")
@@ -47,12 +57,12 @@ def send_order():
         mutex.acquire()
         pick_up_order = st.pop()
         order_to_json = json.dumps(pick_up_order.__dict__)
-        requests.put("http://localhost:3501/put", json=order_to_json)
+        requests.put("http://127.0.0.1:3501/put", json=order_to_json)
         ## unlock
         mutex.release()
     ## notify kitchen that no more orders are coming
     if len(st) == 0:
-        requests.put("http://localhost:3501/put", json={"state": "no more incoming orders"})
+        requests.put("http://127.0.0.1:3501/put", json={"state": "no more incoming orders"})
 
 ## multiple waiters threads
 waiters = [threading.Thread(target=send_order) for i in range(4)]
@@ -62,4 +72,4 @@ if __name__ == '__main__':
     for waiter in waiters:
         waiter.start()
     ## starting dinning hall server
-    DH_App.run(host='localhost', port=3500)
+    DH_App.run(host='127.0.0.1', port=3500)
